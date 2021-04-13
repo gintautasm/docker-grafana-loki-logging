@@ -1,0 +1,44 @@
+version: "3"
+
+services:
+  ubuntu:
+    image:
+      ubuntu:latest
+    depends_on:
+      - fluent-bit-loki
+    # disable inotify required cause wsl2 has a bug :/
+    command: tail -f /mnt/log/parkinger-api/all.log ---disable-inotify
+    volumes:
+      - /c/dev/logs:/mnt/log
+    logging:
+      driver: "fluentd"
+      options:
+        tag: docker-ubuntu
+  fluent-bit-loki:
+    ports:
+      - "24224:24224"
+      - "24224:24224/udp"
+    environment:
+      # - LOG_PATH=/var/log/*/*.log
+      - LOKI_URL=http://loki:3100/loki/api/v1/push
+    image:
+      grafana/fluent-bit-plugin-loki:latest
+    volumes:
+      - ./fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf
+      # parsers are good for non starndad input, for now disabled as it fails to parse
+      #- ./parser.conf:/fluent-bit/etc/parsers.conf
+    # volumes:
+    #   - /c/dev/logs:/var/log
+  depends_on:
+    - loki
+  loki:
+    image: grafana/loki:2.2.0
+    ports:
+      - "3100:3100"
+    volumes:
+      - .:/mnt/config
+    command: -config.file=/mnt/config/loki-config.yaml
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3001:3000"
